@@ -1,5 +1,9 @@
 // Service worker: guarda a "casca" do app para abrir offline e permitir instalação
-const CACHE = 'validades-v1';
+// e também recebe as notificações push do OneSignal.
+// (try/catch: se estiver sem internet, o app continua abrindo normalmente)
+try { importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js'); } catch (e) {}
+
+const CACHE = 'validades-v2';
 const ARQUIVOS = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (e) => {
