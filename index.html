@@ -62,6 +62,7 @@
 <body>
 <header>
   <h1>Validades</h1>
+  <button id="btnPush" hidden>🔔 Ativar avisos</button>
   <button id="btnAdd">+ Produto</button>
   <button id="btnAtualizar" aria-label="Atualizar">↻</button>
   <button id="btnCfg" aria-label="Configurações">⚙</button>
@@ -261,8 +262,46 @@ $('#frmCfg').addEventListener('submit', async (e) => {
   }
 });
 
+/* ---------- notificações push (OneSignal) ---------- */
+// Cole aqui o App ID do OneSignal (não é segredo). Enquanto estiver com o texto
+// de exemplo, o app funciona normalmente, só sem o botão de notificações.
+const ONESIGNAL_APP_ID = 'ceed83b6-5966-442c-81b8-ea386b60e9e7';
+const pushAtivo = !!ONESIGNAL_APP_ID && !ONESIGNAL_APP_ID.startsWith('COLE_');
+// pasta onde o app está hospedado (ex.: /nome-do-repo/ no GitHub Pages)
+const BASE = location.pathname.replace(/[^/]*$/, '');
+
+function atualizarBotaoPush() {
+  // só mostra o botão se o navegador suporta e a pessoa ainda não decidiu
+  $('#btnPush').hidden = !(pushAtivo && 'Notification' in window && Notification.permission === 'default');
+}
+
+if (pushAtivo) {
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(async (OneSignal) => {
+    await OneSignal.init({
+      appId: ONESIGNAL_APP_ID,
+      serviceWorkerPath: BASE.slice(1) + 'sw.js',
+      serviceWorkerParam: { scope: BASE },
+      notifyButton: { enable: false }
+    });
+    atualizarBotaoPush();
+  });
+  const s = document.createElement('script');
+  s.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
+  s.defer = true;
+  document.head.appendChild(s);
+  $('#btnPush').onclick = () => {
+    window.OneSignalDeferred.push(async (OneSignal) => {
+      await OneSignal.Notifications.requestPermission();
+      atualizarBotaoPush();
+    });
+  };
+  atualizarBotaoPush();
+} else if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
 /* ---------- início ---------- */
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 document.addEventListener('visibilitychange', () => { if (!document.hidden) carregar(); });
 if (!cfg().url) { render(); setTimeout(() => $('#dlgCfg').showModal(), 300); } else { carregar(); }
 </script>
