@@ -275,26 +275,58 @@ function atualizarBotaoPush() {
   $('#btnPush').hidden = !(pushAtivo && 'Notification' in window && Notification.permission === 'default');
 }
 
+let osPronto = false;
+let osErro = '';
+
 if (pushAtivo) {
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   window.OneSignalDeferred.push(async (OneSignal) => {
-    await OneSignal.init({
-      appId: ONESIGNAL_APP_ID,
-      serviceWorkerPath: BASE.slice(1) + 'sw.js',
-      serviceWorkerParam: { scope: BASE },
-      notifyButton: { enable: false }
-    });
+    try {
+      await OneSignal.init({
+        appId: ONESIGNAL_APP_ID,
+        serviceWorkerPath: BASE.slice(1) + 'sw.js',
+        serviceWorkerParam: { scope: BASE },
+        notifyButton: { enable: false }
+      });
+      osPronto = true;
+    } catch (e) {
+      osErro = (e && e.message) || String(e);
+    }
     atualizarBotaoPush();
   });
   const s = document.createElement('script');
   s.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
   s.defer = true;
+  s.onerror = () => { osErro = 'Não consegui carregar o OneSignal (sem internet ou bloqueador de anúncios).'; };
   document.head.appendChild(s);
-  $('#btnPush').onclick = () => {
-    window.OneSignalDeferred.push(async (OneSignal) => {
-      await OneSignal.Notifications.requestPermission();
-      atualizarBotaoPush();
-    });
+
+  $('#btnPush').onclick = async () => {
+    try {
+      // pede a permissão direto ao navegador (aparece a janelinha do Chrome)
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') {
+        alert('As notificações não foram permitidas neste navegador.');
+        atualizarBotaoPush();
+        return;
+      }
+      if (!osPronto) {
+        alert('Permissão concedida, mas o OneSignal não iniciou. ' +
+          (osErro ? 'Motivo: ' + osErro : 'Ele ainda pode estar carregando; toque de novo em alguns segundos.'));
+        return;
+      }
+      window.OneSignalDeferred.push(async (OneSignal) => {
+        try {
+          await OneSignal.User.PushSubscription.optIn();
+          alert('Avisos ativados neste celular.');
+        } catch (e) {
+          alert('Erro ao ativar no OneSignal: ' + ((e && e.message) || e));
+        }
+        atualizarBotaoPush();
+      });
+    } catch (e) {
+      alert('Erro: ' + ((e && e.message) || e));
+    }
+    atualizarBotaoPush();
   };
   atualizarBotaoPush();
 } else if ('serviceWorker' in navigator) {
